@@ -7,6 +7,7 @@ interface Child {
   nickname: string;
   points: number;
   family_id: string;
+  pin: string;
 }
 
 interface Submission {
@@ -44,7 +45,7 @@ export default function Dashboard() {
     let familyData = null;
     
     // Try RPC function first
-    const { data: familyId, error: rpcError } = await supabase.rpc(
+    const { error: rpcError } = await supabase.rpc(
       'ensure_family_exists',
       { user_id: session.user.id }
     );
@@ -187,7 +188,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleApprove = async (submissionId: string, childId: string) => {
+  const handleApprove = async (submissionId: string) => {
     setLoading(true);
     try {
       const { error } = await supabase
@@ -364,7 +365,7 @@ export default function Dashboard() {
                       {submission.child.nickname}
                     </p>
                     <button
-                      onClick={() => handleApprove(submission.id, submission.child_id)}
+                      onClick={() => handleApprove(submission.id)}
                       disabled={loading}
                       className="w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
                     >
