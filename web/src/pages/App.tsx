@@ -7,7 +7,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-export default function LoginPage() {
+export default function ParentLogin() {
   const [loading, setLoading] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
@@ -147,6 +147,13 @@ export default function LoginPage() {
             />
           </svg>
           {loading ? '로그인 중...' : 'Google로 로그인'}
+        </button>
+
+        <button
+          onClick={() => navigate('/')}
+          className="w-full mt-4 text-sm text-gray-500 hover:text-gray-700"
+        >
+          ← 뒤로 가기
         </button>
       </div>
     </div>

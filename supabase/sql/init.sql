@@ -114,11 +114,21 @@ CREATE POLICY "Parents can view their own family"
   ON families FOR SELECT
   USING (auth.uid() = parent_id);
 
+-- Allow anyone to view family by family_code (for child login)
+CREATE POLICY "Anyone can view family by family_code"
+  ON families FOR SELECT
+  USING (true); -- Allow public read for login purposes
+
 CREATE POLICY "Parents can insert their own family"
   ON families FOR INSERT
   WITH CHECK (auth.uid() = parent_id);
 
 -- RLS Policies for children
+-- Allow children to view children by PIN within a family (for login)
+CREATE POLICY "Allow children view by PIN"
+  ON children FOR SELECT
+  USING (true); -- Allow public read for PIN-based login
+
 -- Parents can view children in their family
 CREATE POLICY "Parents can view children in their family"
   ON children FOR SELECT
