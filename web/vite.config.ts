@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['mint-star96.png', 'choremint_app_icon.png', 'vite.svg'],
+      includeAssets: ['mint-star96.png', 'choremint_app_icon.png'],
       manifest: {
         name: 'ChoreMint',
         short_name: 'ChoreMint',
@@ -65,6 +65,12 @@ export default defineConfig({
     })
   ],
   server: {
+    host: '0.0.0.0',
     port: 5173,
+    hmr: {
+      host: '10.228.185.250', // Mac의 LAN IP
+      clientPort: 5173,
+      protocol: 'ws'
+    }
   },
 })
