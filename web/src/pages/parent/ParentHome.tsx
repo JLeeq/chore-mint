@@ -71,22 +71,39 @@ export default function ParentHome() {
     }
 
     try {
+      console.log('Loading family for user:', session.user.id);
       // Load family
       const { data: familyData, error: familyError } = await supabase
         .from('families')
         .select('*')
         .eq('parent_id', session.user.id)
         .single();
+      
+      console.log('Family query result:', { familyData, familyError });
 
       if (familyError) {
         console.error('Error loading family:', familyError);
+        
+        // PGRST116 에러는 데이터가 없다는 의미이므로 가족 생성 시도
+        if (familyError.code === 'PGRST116') {
+          console.log('Family not found, creating new family...');
+        } else {
+          console.error('Unexpected error loading family:', familyError);
+          alert(`가족 정보를 불러오는 중 오류가 발생했습니다: ${familyError.message}`);
+          setLoading(false);
+          return;
+        }
+        
         // Try to create family if it doesn't exist
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         if (currentSession) {
+          console.log('Calling ensure_family_exists RPC...');
           const { data: newFamilyId, error: createError } = await supabase.rpc(
             'ensure_family_exists',
             { user_id: currentSession.user.id }
           );
+          
+          console.log('RPC result:', { newFamilyId, createError });
           if (createError) {
             console.error('Error creating family:', createError);
             // Fallback: Try to create family manually
@@ -139,9 +156,11 @@ export default function ParentHome() {
       }
 
       if (familyData) {
+        console.log('Family found:', familyData);
         setFamily(familyData);
         await loadChildrenAndData(familyData.id);
       } else {
+        console.log('Family data is null, trying to create...');
         // Family doesn't exist, try to create
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         if (currentSession) {
@@ -149,13 +168,36 @@ export default function ParentHome() {
             'ensure_family_exists',
             { user_id: currentSession.user.id }
           );
-          if (!createError && newFamilyId) {
-            const { data: reloadedFamily } = await supabase
+          if (createError) {
+            console.error('RPC create error:', createError);
+            // Fallback: manual creation
+            const familyCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const { data: newFamily, error: insertError } = await supabase
+              .from('families')
+              .insert({
+                parent_id: currentSession.user.id,
+                family_code: familyCode,
+              })
+              .select()
+              .single();
+            
+            if (insertError) {
+              console.error('Manual create error:', insertError);
+              alert(`가족 생성 중 오류가 발생했습니다: ${insertError.message}`);
+            } else if (newFamily) {
+              setFamily(newFamily);
+              await loadChildrenAndData(newFamily.id);
+            }
+          } else if (newFamilyId) {
+            const { data: reloadedFamily, error: reloadError } = await supabase
               .from('families')
               .select('*')
               .eq('parent_id', session.user.id)
               .single();
-            if (reloadedFamily) {
+            
+            if (reloadError) {
+              console.error('Reload error:', reloadError);
+            } else if (reloadedFamily) {
               setFamily(reloadedFamily);
               await loadChildrenAndData(reloadedFamily.id);
             }
@@ -171,6 +213,7 @@ export default function ParentHome() {
 
   const loadChildrenAndData = async (familyId: string) => {
     try {
+      console.log('Loading children for family:', familyId);
       // Load children
       const { data: childrenData, error: childrenError } = await supabase
         .from('children')
@@ -182,8 +225,10 @@ export default function ParentHome() {
         console.error('Error loading children:', childrenError);
         setChildren([]);
       } else if (childrenData) {
+        console.log('Children loaded:', childrenData.length);
         setChildren(childrenData);
       } else {
+        console.log('No children found');
         setChildren([]);
       }
 
@@ -193,6 +238,7 @@ export default function ParentHome() {
       // Load weekly points (will be called again in useEffect when children are loaded)
     } catch (error) {
       console.error('Error loading children and data:', error);
+      alert(`데이터를 불러오는 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     }
   };
 
@@ -315,7 +361,11 @@ export default function ParentHome() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <p className="text-gray-600">로딩 중...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+          <p className="text-sm text-gray-500 mt-2">잠시만 기다려주세요</p>
+        </div>
       </div>
     );
   }
