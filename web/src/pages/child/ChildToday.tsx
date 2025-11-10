@@ -225,30 +225,28 @@ export default function ChildToday() {
       )}
       
       <div 
-        className="max-w-md mx-auto px-4"
+        className="max-w-md mx-auto"
         style={{
-          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
           paddingBottom: '16px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
         }}
       >
-        {/* Header */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-2xl font-bold text-gray-800">
+        {/* 헤더 + 카드들 간격 일정하게 */}
+        <div className="space-y-4">
+          {/* 헤더: 카드랑 같은 폭/인셋, 배경 없음 */}
+          <div className="px-4">
+            <h1 className="text-2xl font-bold text-gray-800 mb-3">
               Hi, {childSession.nickname} 👋
             </h1>
-            <div className="bg-green-100 rounded-full px-4 py-2 flex items-center gap-1">
-              <Icon name="star" size={14} className="md:w-4 md:h-4" />
-              <span className="text-green-700 font-semibold text-sm">
-                {childSession.points} points
-              </span>
-            </div>
+            <p className="text-gray-600 text-sm mb-7">
+              Complete today&apos;s chores!
+            </p>
           </div>
-          <p className="text-gray-600 text-sm">Complete today's chores!</p>
-        </div>
 
-        {/* Character Section */}
-        <div className="bg-gradient-to-br from-[#E6F9F5] to-[#D0F4ED] rounded-3xl shadow-xl p-6 mb-4">
+          {/* Character Section */}
+          <div className="bg-gradient-to-br from-[#E6F9F5] to-[#D0F4ED] rounded-3xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-gray-800 mb-1">My Character</h2>
@@ -391,15 +389,15 @@ export default function ChildToday() {
               />
             </div>
           </div>
-        </div>
-
-        {/* Today's Chores */}
-        {assignments.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
-            <p className="text-gray-500 text-lg">No chores today! 🎉</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
+
+          {/* Today's Chores */}
+          {assignments.length === 0 ? (
+            <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+              <p className="text-gray-500 text-lg">No chores today! 🎉</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
             {assignments.map((assignment) => (
               <div
                 key={assignment.id}
@@ -423,8 +421,9 @@ export default function ChildToday() {
                 </div>
               </div>
             ))}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
       <ChildTabNav />
     </div>
