@@ -10,13 +10,19 @@ export default function ChildLogin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if child is already logged in
+    // Check if child is already logged in (세션 만료 체크)
     const childSession = localStorage.getItem('child_session');
     if (childSession) {
       try {
         const session = JSON.parse(childSession);
-        if (session.childId && session.nickname && session.familyId) {
-          navigate('/child/today');
+        // 만료 시간 체크
+        if (session.expiresAt && session.expiresAt > Date.now()) {
+          if (session.childId && session.nickname && session.familyId) {
+            navigate('/child/today');
+          }
+        } else {
+          // 만료된 세션 삭제
+          localStorage.removeItem('child_session');
         }
       } catch (e) {
         localStorage.removeItem('child_session');
@@ -68,7 +74,7 @@ export default function ChildLogin() {
         throw new Error('PIN이 올바르지 않거나 이 가족에 속하지 않습니다.');
       }
 
-      // Save child session
+      // Save child session (30일 유지)
       const childSession = {
         childId: childData.id,
         nickname: childData.nickname,
@@ -76,9 +82,10 @@ export default function ChildLogin() {
         points: childData.points,
         familyId: childData.family_id,
         loggedInAt: Date.now(),
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30일 후 만료
       };
 
-             localStorage.setItem('child_session', JSON.stringify(childSession));
+      localStorage.setItem('child_session', JSON.stringify(childSession));
              
              // Navigate to child dashboard
              navigate('/child/today');

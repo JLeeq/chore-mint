@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import ChildTabNav from '../../components/ChildTabNav';
+import Icon from '../../components/Icon';
 
 interface ChildSession {
   childId: string;
@@ -15,16 +17,46 @@ export default function ChildProfile() {
 
   useEffect(() => {
     const session = localStorage.getItem('child_session');
-    if (session) {
-      try {
-        const parsedSession: ChildSession = JSON.parse(session);
-        setChildSession(parsedSession);
-      } catch (e) {
-        navigate('/child-login');
-      }
-    } else {
+    if (!session) {
       navigate('/child-login');
+      return;
     }
+
+    let parsedSession: ChildSession;
+    try {
+      parsedSession = JSON.parse(session);
+      setChildSession(parsedSession);
+    } catch (e) {
+      navigate('/child-login');
+      return;
+    }
+
+    // Subscribe to children table updates (포인트 실시간 갱신)
+    const childrenChannel = supabase
+      .channel('child-profile-points-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'children',
+          filter: `id=eq.${parsedSession.childId}`,
+        },
+        (payload) => {
+          console.log('Child points updated:', payload);
+          // 포인트가 업데이트되면 세션과 상태 업데이트
+          if (payload.new.points !== undefined) {
+            const updatedSession = { ...parsedSession, points: payload.new.points };
+            localStorage.setItem('child_session', JSON.stringify(updatedSession));
+            setChildSession(updatedSession);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(childrenChannel);
+    };
   }, [navigate]);
 
   const handleLogout = () => {
@@ -57,7 +89,10 @@ export default function ChildProfile() {
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-600">보유 포인트</span>
-                <span className="text-2xl font-bold text-blue-600">⭐ {childSession.points}점</span>
+                <span className="text-2xl font-bold text-blue-600 flex items-center gap-1">
+                  <Icon name="star" size={24} />
+                  {childSession.points}점
+                </span>
               </div>
             </div>
 

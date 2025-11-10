@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import Icon from '../components/Icon';
 
 interface Child {
   id: string;
@@ -295,7 +296,10 @@ export default function Dashboard() {
                     <div key={child.id} className="p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
                       <div className="flex justify-between items-center mb-3">
                         <span className="font-bold text-lg text-gray-800">{child.nickname}</span>
-                        <span className="text-blue-600 font-bold text-lg">⭐ {child.points}점</span>
+                        <span className="text-blue-600 font-bold text-lg flex items-center gap-1">
+                          <Icon name="star" size={20} />
+                          {child.points}점
+                        </span>
                       </div>
                       <div className="bg-white rounded-lg p-3 mb-2 space-y-2">
                         <div>

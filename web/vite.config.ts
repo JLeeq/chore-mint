@@ -56,7 +56,9 @@ export default defineConfig({
               }
             }
           }
-        ]
+        ],
+        // Service Worker에 푸시 알림 이벤트 리스너 추가
+        importScripts: ['/sw-custom.js']
       },
       devOptions: {
         enabled: true,

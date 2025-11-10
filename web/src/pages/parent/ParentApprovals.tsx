@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ParentTabNav from '../../components/ParentTabNav';
+import Icon from '../../components/Icon';
+import { sendPushNotification } from '../../lib/pushNotifications';
 
 interface Submission {
   id: string;
@@ -88,12 +90,26 @@ export default function ParentApprovals() {
   const handleApprove = async (submissionId: string) => {
     setLoading(true);
     try {
+      // 제출물 정보 가져오기 (승인 전)
+      const submission = submissions.find(s => s.id === submissionId);
+      
       const { error } = await supabase
         .from('submissions')
         .update({ status: 'approved' })
         .eq('id', submissionId);
 
       if (error) throw error;
+
+      // 승인 후 푸시 알림 전송
+      if (submission) {
+        const points = submission.chore?.points || 10;
+        await sendPushNotification(
+          submission.child_id,
+          '축하합니다! 🎉',
+          `${submission.chore?.title || '집안일'}이 승인되어 ${points}점을 받았습니다!`,
+          '/child/today'
+        );
+      }
 
       setSelectedSubmission(null);
       loadSubmissions();
@@ -183,8 +199,8 @@ export default function ParentApprovals() {
                   {selectedSubmission.child.nickname}
                 </h3>
                 {selectedSubmission.chore && (
-                  <p className="text-gray-600 mb-4">
-                    {selectedSubmission.chore.title} - ⭐ {selectedSubmission.chore.points}점
+                  <p className="text-gray-600 mb-4 flex items-center gap-1">
+                    {selectedSubmission.chore.title} - <Icon name="star" size={16} /> {selectedSubmission.chore.points}점
                   </p>
                 )}
                 <div className="flex gap-4">

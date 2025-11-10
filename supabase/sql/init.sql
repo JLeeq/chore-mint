@@ -155,6 +155,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to add points when submission is approved (via points_ledger)
+-- SECURITY DEFINER로 설정하여 RLS 정책을 우회하고 시스템 권한으로 실행
 CREATE OR REPLACE FUNCTION update_child_points()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -172,7 +173,7 @@ BEGIN
       points_value := 10;
     END IF;
     
-    -- Insert into points_ledger
+    -- Insert into points_ledger (SECURITY DEFINER로 실행되므로 RLS 우회)
     INSERT INTO points_ledger (child_id, delta, reason, submission_id)
     VALUES (NEW.child_id, points_value, 'chore_approved', NEW.id);
     
@@ -192,7 +193,7 @@ BEGIN
   
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger to update points on approval
 CREATE TRIGGER on_submission_approved
@@ -438,6 +439,12 @@ CREATE POLICY "Family members can view points ledger in their family"
       )
     )
   );
+
+-- Allow system (trigger function) to insert points ledger
+DROP POLICY IF EXISTS "Allow system to insert points ledger" ON points_ledger;
+CREATE POLICY "Allow system to insert points ledger"
+  ON points_ledger FOR INSERT
+  WITH CHECK (true); -- 트리거 함수가 자동으로 추가하도록 허용
 
 -- RLS Policies for push_subscriptions
 CREATE POLICY "Users can manage their own subscriptions"

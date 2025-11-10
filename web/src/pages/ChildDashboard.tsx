@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import Icon from '../components/Icon';
 
 interface ChildSession {
   childId: string;
@@ -130,7 +131,10 @@ export default function ChildDashboard() {
                 안녕하세요, {childSession.nickname}님! 👋
               </h1>
               <p className="text-gray-600 mt-1">
-                현재 포인트: <span className="font-bold text-orange-500 text-lg">⭐ {childSession.points}점</span>
+                현재 포인트: <span className="font-bold text-orange-500 text-lg inline-flex items-center gap-1">
+                  <Icon name="star" size={20} />
+                  {childSession.points}점
+                </span>
               </p>
             </div>
             <button

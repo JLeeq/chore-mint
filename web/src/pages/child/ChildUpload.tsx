@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ChildTabNav from '../../components/ChildTabNav';
+import Icon from '../../components/Icon';
 
 interface ChildSession {
   childId: string;
@@ -10,10 +11,16 @@ interface ChildSession {
   familyId: string;
 }
 
+interface ChoreStep {
+  order: number;
+  description: string;
+}
+
 interface Chore {
   id: string;
   title: string;
   points: number;
+  steps?: ChoreStep[];
 }
 
 export default function ChildUpload() {
@@ -23,6 +30,7 @@ export default function ChildUpload() {
   const [chore, setChore] = useState<Chore | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,6 +64,14 @@ export default function ChildUpload() {
 
       if (data) {
         setChore(data);
+        // steps가 JSON 문자열인 경우 파싱
+        if (data.steps && typeof data.steps === 'string') {
+          try {
+            data.steps = JSON.parse(data.steps);
+          } catch (e) {
+            console.error('Error parsing steps:', e);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading chore:', error);
@@ -72,6 +88,16 @@ export default function ChildUpload() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleStepToggle = (order: number) => {
+    const newCompleted = new Set(completedSteps);
+    if (newCompleted.has(order)) {
+      newCompleted.delete(order);
+    } else {
+      newCompleted.add(order);
+    }
+    setCompletedSteps(newCompleted);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -149,13 +175,52 @@ export default function ChildUpload() {
       <div className="max-w-md w-full mx-auto p-4">
         {/* Header */}
         <div className="bg-white rounded-3xl shadow-lg p-6 mb-4">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            {chore ? chore.title : '사진 업로드'}
-          </h1>
-          {chore && (
-            <p className="text-gray-600 text-sm">⭐ {chore.points}점 획득 가능</p>
-          )}
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-2xl font-bold text-gray-800">
+              {chore ? chore.title : '사진 업로드'}
+            </h1>
+            {chore && (
+              <div className="bg-green-100 rounded-full px-4 py-2 flex items-center gap-1">
+                <Icon name="star" size={16} />
+                <span className="text-green-700 font-semibold text-sm">
+                  {chore.points}점
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* 집안일 단계 표시 */}
+        {chore && chore.steps && chore.steps.length > 0 && (
+          <div className="bg-white rounded-3xl shadow-lg p-6 mb-4">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">How to do it:</h2>
+            <div className="space-y-3">
+              {chore.steps.map((step) => {
+                const isCompleted = completedSteps.has(step.order);
+                return (
+                  <label
+                    key={step.order}
+                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                      isCompleted
+                        ? 'bg-green-50 border-2 border-green-200'
+                        : 'bg-gray-50 border-2 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isCompleted}
+                      onChange={() => handleStepToggle(step.order)}
+                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                    />
+                    <span className={`flex-1 ${isCompleted ? 'line-through text-gray-500' : 'text-gray-800'}`}>
+                      {step.description}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Photo Upload Card */}

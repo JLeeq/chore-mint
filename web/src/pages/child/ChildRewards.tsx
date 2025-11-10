@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ChildTabNav from '../../components/ChildTabNav';
+import Icon from '../../components/Icon';
 
 interface ChildSession {
   childId: string;
@@ -25,30 +26,104 @@ export default function ChildRewards() {
 
   useEffect(() => {
     const session = localStorage.getItem('child_session');
-    if (session) {
-      try {
-        const parsedSession: ChildSession = JSON.parse(session);
-        setChildSession(parsedSession);
-        loadPointsHistory(parsedSession.childId);
-      } catch (e) {
-        navigate('/child-login');
-      }
-    } else {
+    if (!session) {
       navigate('/child-login');
+      return;
     }
+
+    let parsedSession: ChildSession;
+    try {
+      parsedSession = JSON.parse(session);
+      setChildSession(parsedSession);
+      // 초기 로드 시 최신 포인트 가져오기
+      loadPointsHistory(parsedSession.childId);
+    } catch (e) {
+      navigate('/child-login');
+      return;
+    }
+
+    // Subscribe to children table updates (포인트 실시간 갱신)
+    const childrenChannel = supabase
+      .channel('child-rewards-points-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'children',
+          filter: `id=eq.${parsedSession.childId}`,
+        },
+        (payload) => {
+          console.log('Child points updated:', payload);
+          // 포인트가 업데이트되면 세션과 상태 업데이트
+          if (payload.new.points !== undefined) {
+            const updatedSession = { ...parsedSession, points: payload.new.points };
+            localStorage.setItem('child_session', JSON.stringify(updatedSession));
+            setChildSession(updatedSession);
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to points_ledger updates (포인트 내역 실시간 갱신)
+    const pointsLedgerChannel = supabase
+      .channel('child-rewards-ledger-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'points_ledger',
+          filter: `child_id=eq.${parsedSession.childId}`,
+        },
+        (payload) => {
+          console.log('New points ledger entry:', payload);
+          // 포인트 내역 새로고침 (최신 포인트도 함께 가져옴)
+          loadPointsHistory(parsedSession.childId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(childrenChannel);
+      supabase.removeChannel(pointsLedgerChannel);
+    };
   }, [navigate]);
 
   const loadPointsHistory = async (childId: string) => {
     try {
-      const { data } = await supabase
-        .from('points_ledger')
-        .select('*')
-        .eq('child_id', childId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      // 포인트 내역과 함께 최신 포인트도 가져오기
+      const [historyResult, childResult] = await Promise.all([
+        supabase
+          .from('points_ledger')
+          .select('*')
+          .eq('child_id', childId)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('children')
+          .select('points')
+          .eq('id', childId)
+          .single()
+      ]);
 
-      if (data) {
-        setPointsHistory(data);
+      if (historyResult.data) {
+        setPointsHistory(historyResult.data);
+      }
+
+      // 최신 포인트로 세션 업데이트
+      if (childResult.data) {
+        const session = localStorage.getItem('child_session');
+        if (session) {
+          try {
+            const parsedSession: ChildSession = JSON.parse(session);
+            const updatedSession = { ...parsedSession, points: childResult.data.points };
+            localStorage.setItem('child_session', JSON.stringify(updatedSession));
+            setChildSession(updatedSession);
+          } catch (e) {
+            console.error('Error updating session:', e);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading points history:', error);
@@ -71,8 +146,9 @@ export default function ChildRewards() {
         {/* Points Summary */}
         <div className="bg-white rounded-3xl shadow-xl p-6 mb-4">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              ⭐ {childSession.points}점
+            <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-2">
+              <Icon name="star" size={32} />
+              {childSession.points}점
             </h1>
             <p className="text-gray-600">보유 포인트</p>
           </div>

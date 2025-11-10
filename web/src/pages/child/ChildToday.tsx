@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ChildTabNav from '../../components/ChildTabNav';
+import Icon from '../../components/Icon';
+import { initializePushNotifications } from '../../lib/pushNotifications';
 
 interface ChoreAssignment {
   id: string;
@@ -32,20 +34,47 @@ export default function ChildToday() {
 
   useEffect(() => {
     const session = localStorage.getItem('child_session');
-    if (session) {
-      try {
-        const parsedSession: ChildSession = JSON.parse(session);
-        setChildSession(parsedSession);
-        loadAssignments(parsedSession.childId);
-      } catch (e) {
-        navigate('/child-login');
-      }
-    } else {
+    if (!session) {
       navigate('/child-login');
+      return;
     }
 
-    // Subscribe to submission status updates
-    const channel = supabase
+    let parsedSession: ChildSession;
+    try {
+      parsedSession = JSON.parse(session);
+      setChildSession(parsedSession);
+      loadAssignments(parsedSession.childId);
+      // 초기 로드 시 최신 포인트 가져오기
+      loadLatestPoints(parsedSession.childId);
+      
+      // 자녀 로그인 시 푸시 알림 구독
+      initializePushNotifications(parsedSession.childId, true);
+    } catch (e) {
+      navigate('/child-login');
+      return;
+    }
+
+    // Subscribe to new chore assignments for this child
+    const assignmentsChannel = supabase
+      .channel('child-assignments-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chore_assignments',
+          filter: `child_id=eq.${parsedSession.childId}`,
+        },
+        (payload) => {
+          console.log('New assignment received:', payload);
+          // Reload assignments when new one is created
+          loadAssignments(parsedSession.childId);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to submission status updates (해당 자녀의 제출물만)
+    const submissionsChannel = supabase
       .channel('child-submissions-updates')
       .on(
         'postgres_changes',
@@ -53,37 +82,45 @@ export default function ChildToday() {
           event: 'UPDATE',
           schema: 'public',
           table: 'submissions',
+          filter: `child_id=eq.${parsedSession.childId}`,
         },
         (payload) => {
           if (payload.new.status === 'approved') {
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 3000);
-            
-            // Update points in session
-            const session = localStorage.getItem('child_session');
-            if (session) {
-              const parsedSession: ChildSession = JSON.parse(session);
-              // Reload points from database
-              supabase
-                .from('children')
-                .select('points')
-                .eq('id', parsedSession.childId)
-                .single()
-                .then(({ data }) => {
-                  if (data) {
-                    const updatedSession = { ...parsedSession, points: data.points };
-                    localStorage.setItem('child_session', JSON.stringify(updatedSession));
-                    setChildSession(updatedSession);
-                  }
-                });
-            }
+            // 포인트는 children 테이블 업데이트로 자동 갱신됨
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to children table updates (포인트 실시간 갱신)
+    const childrenChannel = supabase
+      .channel('child-points-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'children',
+          filter: `id=eq.${parsedSession.childId}`,
+        },
+        (payload) => {
+          console.log('Child points updated:', payload);
+          // 포인트가 업데이트되면 세션과 상태 업데이트
+          if (payload.new.points !== undefined) {
+            const updatedSession = { ...parsedSession, points: payload.new.points };
+            localStorage.setItem('child_session', JSON.stringify(updatedSession));
+            setChildSession(updatedSession);
           }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(assignmentsChannel);
+      supabase.removeChannel(submissionsChannel);
+      supabase.removeChannel(childrenChannel);
     };
   }, [navigate]);
 
@@ -109,6 +146,32 @@ export default function ChildToday() {
       console.error('Error loading assignments:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadLatestPoints = async (childId: string) => {
+    try {
+      const { data } = await supabase
+        .from('children')
+        .select('points')
+        .eq('id', childId)
+        .single();
+
+      if (data) {
+        const session = localStorage.getItem('child_session');
+        if (session) {
+          try {
+            const parsedSession: ChildSession = JSON.parse(session);
+            const updatedSession = { ...parsedSession, points: data.points };
+            localStorage.setItem('child_session', JSON.stringify(updatedSession));
+            setChildSession(updatedSession);
+          } catch (e) {
+            console.error('Error updating session:', e);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading latest points:', error);
     }
   };
 
@@ -140,9 +203,10 @@ export default function ChildToday() {
             <h1 className="text-2xl font-bold text-gray-800">
               Hi, {childSession.nickname} 👋
             </h1>
-            <div className="bg-green-100 rounded-full px-4 py-2">
+            <div className="bg-green-100 rounded-full px-4 py-2 flex items-center gap-1">
+              <Icon name="star" size={16} />
               <span className="text-green-700 font-semibold text-sm">
-                ⭐ {childSession.points} 포인트
+                {childSession.points} 포인트
               </span>
             </div>
           </div>
@@ -168,7 +232,7 @@ export default function ChildToday() {
                     {assignment.chore.title}
                   </h3>
                   <div className="flex items-center justify-center gap-1 mb-3">
-                    <span className="text-yellow-500">⭐</span>
+                    <Icon name="star" size={16} className="text-yellow-500" />
                     <span className="text-sm font-semibold text-gray-700">
                       {assignment.chore.points}점
                     </span>

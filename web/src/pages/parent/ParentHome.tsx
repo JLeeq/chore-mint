@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ParentTabNav from '../../components/ParentTabNav';
+import { initializePushNotifications } from '../../lib/pushNotifications';
 
 interface Family {
   id: string;
@@ -29,6 +30,18 @@ export default function ParentHome() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // 푸시 알림 초기화
+  useEffect(() => {
+    const initPush = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // 부모 로그인 시 푸시 알림 구독
+        await initializePushNotifications(session.user.id, false);
+      }
+    };
+    initPush();
   }, []);
 
   useEffect(() => {

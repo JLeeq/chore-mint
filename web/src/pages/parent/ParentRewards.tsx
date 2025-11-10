@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ParentTabNav from '../../components/ParentTabNav';
+import Icon from '../../components/Icon';
 
 interface Child {
   id: string;
@@ -112,7 +113,10 @@ export default function ParentRewards() {
               {children.map((child) => (
                 <div key={child.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
                   <span className="font-semibold text-gray-800">{child.nickname}</span>
-                  <span className="text-2xl font-bold text-blue-600">⭐ {child.points}점</span>
+                  <span className="text-2xl font-bold text-blue-600 flex items-center gap-1">
+                    <Icon name="star" size={24} />
+                    {child.points}점
+                  </span>
                 </div>
               ))}
             </div>

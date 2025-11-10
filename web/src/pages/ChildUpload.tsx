@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import Icon from '../components/Icon';
 
 export default function ChildUpload() {
   const [searchParams] = useSearchParams();
@@ -126,8 +127,9 @@ export default function ChildUpload() {
               {nickname ? `Hi, ${nickname} 👋` : 'ChoreMint'}
             </h1>
             {nickname && (
-              <div className="bg-green-100 rounded-full px-4 py-2">
-                <span className="text-green-700 font-semibold text-sm">⭐ 포인트</span>
+              <div className="bg-green-100 rounded-full px-4 py-2 flex items-center gap-1">
+                <Icon name="star" size={16} />
+                <span className="text-green-700 font-semibold text-sm">포인트</span>
               </div>
             )}
           </div>

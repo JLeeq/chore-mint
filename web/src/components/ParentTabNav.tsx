@@ -1,14 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
+import Icon from './Icon';
 
 export default function ParentTabNav() {
   const location = useLocation();
 
   const tabs = [
-    { path: '/parent/home', label: '홈', icon: '🏠' },
-    { path: '/parent/chores', label: '집안일', icon: '🧹' },
-    { path: '/parent/approvals', label: '승인', icon: '✅' },
-    { path: '/parent/rewards', label: '보상', icon: '🎁' },
-    { path: '/parent/profile', label: '프로필', icon: '👤' },
+    { path: '/parent/home', label: 'Dashboard', iconName: 'home', emoji: '🏠' },
+    { path: '/parent/chores', label: 'Chores', iconName: 'chore', emoji: '🧹' },
+    { path: '/parent/approvals', label: 'Pending', iconName: 'check', emoji: '✅' },
+    { path: '/parent/rewards', label: 'Rewards', iconName: 'gift', emoji: '🎁' },
+    { path: '/parent/profile', label: 'Settings', iconName: 'profile', emoji: '👤' },
   ];
 
   return (
@@ -22,11 +23,17 @@ export default function ParentTabNav() {
               to={tab.path}
               className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
                 isActive
-                  ? 'text-blue-600 bg-blue-50'
+                  ? 'text-[#5CE1C6]'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
-              <span className="text-xl mb-1">{tab.icon}</span>
+              <div className="mb-1">
+                {tab.iconName ? (
+                  <Icon name={tab.iconName} size={24} active={isActive} />
+                ) : (
+                  <span className="text-xl">{tab.emoji}</span>
+                )}
+              </div>
               <span className="text-xs font-medium">{tab.label}</span>
             </Link>
           );

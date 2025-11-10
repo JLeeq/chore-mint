@@ -23,10 +23,13 @@ export default function ParentLogin() {
       }
     });
 
-    // Listen for auth changes
+    // Listen for auth changes (세션 자동 갱신 감지)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         navigate('/parent/home');
+      } else {
+        // 세션이 만료되면 로그인 페이지에 유지
+        console.log('Session expired or signed out');
       }
     });
 
