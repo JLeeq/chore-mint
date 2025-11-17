@@ -38,8 +38,6 @@ export default function ChildToday() {
   const [loading, setLoading] = useState(true);
   const [showConfetti, setShowConfetti] = useState(false);
   const [level, setLevel] = useState(1);
-  const [exp, setExp] = useState(0);
-  const [nextLevelExp, setNextLevelExp] = useState(100);
   const [characterMood, setCharacterMood] = useState<'happy' | 'normal' | 'sleepy'>('happy');
   const [selectedAssignment, setSelectedAssignment] = useState<ChoreAssignment | null>(null);
   const [showChoreDetail, setShowChoreDetail] = useState(false);
@@ -59,7 +57,6 @@ export default function ChildToday() {
     try {
       parsedSession = JSON.parse(session);
         setChildSession(parsedSession);
-      calculateLevel(parsedSession.points);
         loadAssignments(parsedSession.childId);
       // 초기 로드 시 최신 포인트 가져오기
       loadLatestPoints(parsedSession.childId);
@@ -302,13 +299,7 @@ export default function ChildToday() {
   const calculateLevel = (points: number, goalPoints: number | null) => {
     // 레벨 계산: 100포인트마다 레벨 1 증가
     const newLevel = Math.floor(points / 100) + 1;
-    const currentLevelExp = (newLevel - 1) * 100;
-    const currentExp = points - currentLevelExp;
-    const nextExp = newLevel * 100 - currentLevelExp;
-
     setLevel(newLevel);
-    setExp(currentExp);
-    setNextLevelExp(nextExp);
 
     // 캐릭터 기분을 목표치 대비 퍼센트로 결정
     if (goalPoints && goalPoints > 0) {
