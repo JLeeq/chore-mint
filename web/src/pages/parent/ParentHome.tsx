@@ -28,6 +28,9 @@ export default function ParentHome() {
   const [newNickname, setNewNickname] = useState('');
   const [newPin, setNewPin] = useState('');
   const [addingChild, setAddingChild] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [familyNameOnboarding, setFamilyNameOnboarding] = useState('');
+  const [savingOnboarding, setSavingOnboarding] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -91,9 +94,29 @@ export default function ParentHome() {
       )
       .subscribe();
 
+    // Subscribe to families table updates (for family_name changes)
+    const familiesChannel = supabase
+      .channel('parent-home-families-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'families',
+          filter: `id=eq.${family.id}`,
+        },
+        (payload) => {
+          console.log('Family updated:', payload);
+          // family_name이 변경되면 데이터 다시 로드
+          loadData();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(submissionsChannel);
       supabase.removeChannel(pointsLedgerChannel);
+      supabase.removeChannel(familiesChannel);
     };
   }, [family]);
 
@@ -192,6 +215,21 @@ export default function ParentHome() {
       if (familyData) {
         console.log('Family found:', familyData);
         setFamily(familyData);
+        
+        // Check if profile exists
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (!profileData) {
+          // Show onboarding modal
+          setShowOnboarding(true);
+          setLoading(false);
+          return;
+        }
+
         await loadChildrenAndData(familyData.id);
       } else {
         console.log('Family data is null, trying to create...');
@@ -383,6 +421,46 @@ export default function ParentHome() {
     }
   };
 
+  const handleOnboardingSubmit = async () => {
+    if (!familyNameOnboarding.trim() || !family) return;
+    
+    setSavingOnboarding(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Create profile with email username as default name
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: session.user.id,
+          name: session.user.email?.split('@')[0] || 'Parent',
+          role: 'parent',
+          family_id: family.id,
+          notif_opt_in: true,
+        });
+
+      if (profileError) throw profileError;
+
+      // Update family_name
+      const { error: familyError } = await supabase
+        .from('families')
+        .update({ family_name: familyNameOnboarding.trim() })
+        .eq('id', family.id);
+
+      if (familyError) throw familyError;
+
+      setShowOnboarding(false);
+      // Reload data
+      await loadData();
+    } catch (error: any) {
+      console.error('Error saving onboarding:', error);
+      alert('Error occurred while saving: ' + error.message);
+    } finally {
+      setSavingOnboarding(false);
+    }
+  };
+
   const handleAddChild = async () => {
     if (!newNickname || !newPin) {
       alert('Please enter both nickname and PIN.');
@@ -432,6 +510,46 @@ export default function ParentHome() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              Welcome! 👋
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Please set your family name to get started.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Family Name *
+                </label>
+                <input
+                  type="text"
+                  value={familyNameOnboarding}
+                  onChange={(e) => setFamilyNameOnboarding(e.target.value)}
+                  placeholder="e.g., Smith"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6]"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This will appear as "~'s Home" on the home page
+                </p>
+              </div>
+              
+              <button
+                onClick={handleOnboardingSubmit}
+                disabled={savingOnboarding || !familyNameOnboarding.trim()}
+                className="w-full px-6 py-3 bg-[#5CE1C6] text-white rounded-lg hover:bg-[#4BC9B0] transition-colors disabled:opacity-50 font-bold"
+              >
+                {savingOnboarding ? 'Saving...' : 'Get Started'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto p-4">
         {/* Children Avatar Tabs */}
         {children.length > 0 && (

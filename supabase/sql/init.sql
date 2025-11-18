@@ -228,6 +228,11 @@ CREATE POLICY "Parents can insert their own family"
   ON families FOR INSERT
   WITH CHECK (auth.uid() = parent_id);
 
+CREATE POLICY "Parents can update their own family"
+  ON families FOR UPDATE
+  USING (auth.uid() = parent_id)
+  WITH CHECK (auth.uid() = parent_id);
+
 -- RLS Policies for children
 -- Allow children to view children by PIN within a family (for login)
 CREATE POLICY "Allow children view by PIN"
@@ -330,6 +335,10 @@ CREATE POLICY "Authenticated users can delete photos"
 CREATE POLICY "Users can view their own profile"
   ON profiles FOR SELECT
   USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own profile"
+  ON profiles FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own profile"
   ON profiles FOR UPDATE

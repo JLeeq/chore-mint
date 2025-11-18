@@ -7,6 +7,7 @@ interface Family {
   id: string;
   family_code: string;
   family_name?: string;
+  parent_id?: string;
 }
 
 export default function ParentProfile() {
@@ -97,16 +98,55 @@ export default function ParentProfile() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Login required.');
 
+      console.log('Save started:', { 
+        userId: session.user.id, 
+        familyId: family?.id, 
+        familyName,
+        family 
+      });
+
       // Update family_name in families table
       if (family) {
-        const { error: familyError } = await supabase
+        console.log('Updating family:', family.id, 'with name:', familyName);
+        if (family.parent_id) {
+          console.log('Family parent_id:', family.parent_id);
+        }
+        
+        const { data: updatedFamily, error: familyError } = await supabase
           .from('families')
           .update({
             family_name: familyName,
           })
-          .eq('id', family.id);
+          .eq('id', family.id)
+          .select()
+          .single();
 
-        if (familyError) throw familyError;
+        console.log('Family update result:', { 
+          updatedFamily, 
+          familyError,
+          errorCode: familyError?.code,
+          errorMessage: familyError?.message,
+          errorDetails: familyError?.details,
+          errorHint: familyError?.hint
+        });
+        
+        if (familyError) {
+          console.error('Family update error details:', {
+            code: familyError.code,
+            message: familyError.message,
+            details: familyError.details,
+            hint: familyError.hint
+          });
+          throw familyError;
+        }
+        // Update local state with updated family data
+        if (updatedFamily) {
+          console.log('Family updated successfully:', updatedFamily);
+          setFamily(updatedFamily);
+        }
+      } else {
+        console.warn('Family is null, cannot update family_name');
+        alert('Family information is missing. Please refresh the page.');
       }
 
       // Update profile
@@ -122,7 +162,8 @@ export default function ParentProfile() {
       if (error) throw error;
 
       alert('Profile saved!');
-      loadData();
+      // Reload data to ensure everything is in sync
+      await loadData();
     } catch (error: any) {
       alert(error.message || 'Error occurred while saving.');
     } finally {
