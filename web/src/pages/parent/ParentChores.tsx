@@ -742,7 +742,7 @@ export default function ParentChores() {
         {/* Assign Chore Modal with Child Selection */}
         {showChildSelection && selectedChoreForAssign && (
           <div className="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center z-50 p-4 pointer-events-none">
-            <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-5 sm:p-6 max-h-[85vh] overflow-y-auto pointer-events-auto my-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="bg-white rounded-3xl shadow-xl max-w-md w-full p-5 sm:p-6 max-h-[80vh] overflow-y-auto pointer-events-auto my-4" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="flex justify-between items-start mb-5">
                 <h3 className="text-xl sm:text-2xl font-bold text-gray-800 flex-1">Assign Chore</h3>
                 <button
@@ -758,7 +758,7 @@ export default function ParentChores() {
                 </button>
               </div>
 
-              <div className="space-y-5 pb-2">
+              <div className="space-y-5 pb-4">
                 <div>
                   <label className="block text-base font-semibold text-gray-700 mb-2">
                     Due Date
