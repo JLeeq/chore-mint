@@ -768,7 +768,7 @@ export default function ParentChores() {
                     value={assignDueDate}
                     onChange={(e) => setAssignDueDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6] text-base min-h-[44px]"
+                    className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6] text-base min-h-[44px] bg-white"
                   />
                 </div>
 
