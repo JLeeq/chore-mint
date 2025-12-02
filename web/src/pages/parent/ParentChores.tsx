@@ -42,7 +42,6 @@ export default function ParentChores() {
   const [newChorePoints, setNewChorePoints] = useState<number | ''>('');
   const [newChoreSteps, setNewChoreSteps] = useState<ChoreStep[]>([]);
   const [newChoreIcon, setNewChoreIcon] = useState<string>('chore');
-  const [newChoreDueDate, setNewChoreDueDate] = useState<string>('');
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [editingChoreId, setEditingChoreId] = useState<string | null>(null); // 수정 중인 집안일 ID
   const [showTemplates, setShowTemplates] = useState(false); // 기본으로 숨김
@@ -177,7 +176,7 @@ export default function ParentChores() {
       const englishTitle = getEnglishTitle(template.title);
 
       // Create chore with steps and icon
-      const { data: newChore, error: choreError } = await supabase
+      const { data: _newChore, error: choreError } = await supabase
         .from('chores')
         .insert({
           family_id: familyData.id,
@@ -277,7 +276,7 @@ export default function ParentChores() {
         if (!familyData) throw new Error('Family information not found.');
 
         const pointsValue = newChorePoints === '' ? 1 : (typeof newChorePoints === 'number' ? newChorePoints : 1);
-        const { data: newChore, error: choreError } = await supabase
+        const { data: _newChore, error: choreError } = await supabase
           .from('chores')
           .insert({
             family_id: familyData.id,
@@ -301,7 +300,6 @@ export default function ParentChores() {
       setNewChorePoints('');
       setNewChoreSteps([]);
       setNewChoreIcon('chore');
-      setNewChoreDueDate('');
       setEditingChoreId(null);
       setShowCustomForm(false);
       setShowTemplates(false);
