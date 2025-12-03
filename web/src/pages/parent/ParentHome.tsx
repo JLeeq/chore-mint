@@ -711,7 +711,7 @@ export default function ParentHome() {
         {/* Welcome Header */}
         <div className="px-4 pt-6 sm:pt-8 mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-            Welcome home, {parentName || 'Parent'}!
+            Welcome home, {family?.family_name || parentName || 'Family'}!
           </h1>
           <p className="text-gray-600 text-sm sm:text-base">
             Manage your family&apos;s happiness.
