@@ -15,6 +15,8 @@ interface Child {
   nickname: string;
   points: number;
   avatar_url?: string;
+  goal_points?: number | null;
+  reward?: string | null;
 }
 
 
@@ -22,7 +24,7 @@ export default function ParentHome() {
   const [family, setFamily] = useState<Family | null>(null);
   const [children, setChildren] = useState<Child[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [weeklyPoints, setWeeklyPoints] = useState(0);
+  const [parentName, setParentName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [showAddChild, setShowAddChild] = useState(false);
   const [newNickname, setNewNickname] = useState('');
@@ -31,6 +33,11 @@ export default function ParentHome() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [familyNameOnboarding, setFamilyNameOnboarding] = useState('');
   const [savingOnboarding, setSavingOnboarding] = useState(false);
+  const [selectedChild, setSelectedChild] = useState<Child | null>(null);
+  const [showChildModal, setShowChildModal] = useState(false);
+  const [childGoalPoints, setChildGoalPoints] = useState<number>(100);
+  const [childReward, setChildReward] = useState<string>('');
+  const [savingChild, setSavingChild] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -230,6 +237,14 @@ export default function ParentHome() {
           return;
         }
 
+        // Set parent name from profile
+        if (profileData.name) {
+          setParentName(profileData.name);
+        } else {
+          // Fallback to email username if name not set
+          setParentName(session.user.email?.split('@')[0] || 'Parent');
+        }
+
         await loadChildrenAndData(familyData.id);
       } else {
         console.log('Family data is null, trying to create...');
@@ -313,6 +328,8 @@ export default function ParentHome() {
               nickname: child.nickname,
               points: pointsMap.get(child.id) || 0,
               avatar_url: child.avatar_url,
+              goal_points: child.goal_points,
+              reward: child.reward,
             }));
           } else {
             childrenWithPoints = childrenData.map(child => ({
@@ -320,6 +337,8 @@ export default function ParentHome() {
               nickname: child.nickname,
               points: 0,
               avatar_url: child.avatar_url,
+              goal_points: child.goal_points,
+              reward: child.reward,
             }));
           }
         
@@ -367,52 +386,6 @@ export default function ParentHome() {
     }
   };
 
-  const loadWeeklyPoints = async () => {
-    if (children.length === 0) {
-      setWeeklyPoints(0);
-      return;
-    }
-    
-    try {
-      const startOfWeek = new Date();
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
-
-      const childIds = children.map(c => c.id);
-      if (childIds.length === 0) {
-        setWeeklyPoints(0);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('points_ledger')
-        .select('delta')
-        .gte('created_at', startOfWeek.toISOString())
-        .in('child_id', childIds);
-
-      if (error) {
-        console.error('Error loading weekly points:', error);
-        setWeeklyPoints(0);
-        return;
-      }
-
-      if (data) {
-        const total = data.reduce((sum, item) => sum + item.delta, 0);
-        setWeeklyPoints(total);
-      } else {
-        setWeeklyPoints(0);
-      }
-    } catch (error) {
-      console.error('Error loading weekly points:', error);
-      setWeeklyPoints(0);
-    }
-  };
-
-  useEffect(() => {
-    if (children.length > 0 && family) {
-      loadWeeklyPoints();
-    }
-  }, [children, family]);
 
   const copyFamilyCode = () => {
     if (family?.family_code) {
@@ -488,11 +461,38 @@ export default function ParentHome() {
       setNewNickname('');
       setNewPin('');
       setShowAddChild(false);
-      loadData();
+      await loadData();
     } catch (error: any) {
       alert(error.message || 'Error occurred while adding child.');
     } finally {
       setAddingChild(false);
+    }
+  };
+
+  const handleSaveChildSettings = async () => {
+    if (!selectedChild) return;
+
+    setSavingChild(true);
+    try {
+      const { error } = await supabase
+        .from('children')
+        .update({
+          goal_points: childGoalPoints,
+          reward: childReward.trim() || null,
+        })
+        .eq('id', selectedChild.id);
+
+      if (error) throw error;
+
+      // Reload data to update children list
+      await loadData();
+      setShowChildModal(false);
+      setSelectedChild(null);
+    } catch (error: any) {
+      console.error('Error saving child settings:', error);
+      alert(error.message || 'Failed to save settings.');
+    } finally {
+      setSavingChild(false);
     }
   };
 
@@ -510,6 +510,163 @@ export default function ParentHome() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
+      {/* Add Child Modal */}
+      {showAddChild && (
+        <div className="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center z-50 p-4 pointer-events-none">
+          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full px-5 py-6 sm:p-6 max-h-[80vh] overflow-y-auto pointer-events-auto my-2 mx-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex justify-between items-start mb-5">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex-1 pr-2">
+                Add New Child
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAddChild(false);
+                  setNewNickname('');
+                  setNewPin('');
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center min-h-[44px] flex-shrink-0"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-5 pb-2">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Nickname *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter nickname"
+                  value={newNickname}
+                  onChange={(e) => setNewNickname(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  PIN *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter PIN"
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6]"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowAddChild(false);
+                    setNewNickname('');
+                    setNewPin('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium min-h-[44px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddChild}
+                  disabled={addingChild || !newNickname || !newPin}
+                  className="flex-1 px-4 py-2 bg-[#5CE1C6] text-white rounded-lg hover:bg-[#4BC9B0] transition-colors disabled:opacity-50 font-medium min-h-[44px]"
+                >
+                  {addingChild ? 'Adding...' : 'Add'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Child Settings Modal */}
+      {showChildModal && selectedChild && (
+        <div className="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center z-50 p-4 pointer-events-none">
+          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full px-5 py-6 sm:p-6 max-h-[80vh] overflow-y-auto pointer-events-auto my-2 mx-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex justify-between items-start mb-5">
+              <div className="flex items-center gap-3 flex-1 pr-2">
+                <div className="w-12 h-12 rounded-full border-2 border-[#5CE1C6] overflow-hidden bg-gradient-to-br from-orange-400 to-pink-400 flex items-center justify-center flex-shrink-0">
+                  {selectedChild.avatar_url ? (
+                    <img
+                      src={selectedChild.avatar_url}
+                      alt={selectedChild.nickname}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xl font-bold text-white">
+                      {selectedChild.nickname[0].toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                  {selectedChild.nickname}&apos;s Settings
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowChildModal(false);
+                  setSelectedChild(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center min-h-[44px] flex-shrink-0"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-5 pb-2">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Goal Points (목표 포인트)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={childGoalPoints}
+                  onChange={(e) => setChildGoalPoints(parseInt(e.target.value) || 0)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6]"
+                  placeholder="Enter goal points"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Current points: {selectedChild.points} / {childGoalPoints}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Reward (보상)
+                </label>
+                <textarea
+                  value={childReward}
+                  onChange={(e) => setChildReward(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6] min-h-[100px]"
+                  placeholder="Enter reward description (e.g., 'Ice cream', 'New toy', 'Extra screen time')"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This reward will be shown to the child when they reach the goal.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowChildModal(false);
+                    setSelectedChild(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium min-h-[44px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveChildSettings}
+                  disabled={savingChild}
+                  className="flex-1 px-4 py-2 bg-[#5CE1C6] text-white rounded-lg hover:bg-[#4BC9B0] transition-colors disabled:opacity-50 font-medium min-h-[44px]"
+                >
+                  {savingChild ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Onboarding Modal */}
       {showOnboarding && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
@@ -551,45 +708,75 @@ export default function ParentHome() {
       )}
 
       <div className="max-w-4xl mx-auto p-3 sm:p-4">
-        {/* Children Avatar Tabs */}
-        {children.length > 0 && (
-          <div className="mb-4 flex gap-3 overflow-x-auto pb-2">
-            {children.map((child) => (
-              <div
-                key={child.id}
-                className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer"
-                onClick={() => {
-                  // Navigate to child settings page
-                  navigate(`/parent/child/${child.id}/settings`);
-                }}
-              >
-                <div className="w-16 h-16 rounded-full border-2 border-[#5CE1C6] overflow-hidden bg-gradient-to-br from-orange-400 to-pink-400 flex items-center justify-center">
-                  {child.avatar_url ? (
-                    <img
-                      src={child.avatar_url}
-                      alt={child.nickname}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-2xl font-bold text-white">
-                      {child.nickname[0].toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs font-medium text-gray-700 text-center max-w-[80px] truncate">
-                  {child.nickname}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Welcome Header */}
+        <div className="px-4 pt-6 sm:pt-8 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+            Welcome home, {parentName || 'Parent'}!
+          </h1>
+          <p className="text-gray-600 text-sm sm:text-base">
+            Manage your family&apos;s happiness.
+          </p>
+        </div>
 
-        {/* Header */}
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-4 sm:mb-6 pt-6 sm:pt-8">
-          {family?.family_name ? `${family.family_name}'s Home` : 'Home'}
-        </h1>
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
-          <div className="flex justify-between items-center mb-4">
+        {/* Children Avatar Tabs */}
+        <div className="mb-6 flex gap-3 overflow-x-auto pb-2 px-4">
+          {children.map((child) => (
+            <div
+              key={child.id}
+              className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer"
+              onClick={() => {
+                setSelectedChild(child);
+                setChildGoalPoints(child.goal_points || 100);
+                setChildReward(child.reward || '');
+                setShowChildModal(true);
+              }}
+            >
+              <div className="w-16 h-16 rounded-full border-2 border-[#5CE1C6] overflow-hidden bg-gradient-to-br from-orange-400 to-pink-400 flex items-center justify-center">
+                {child.avatar_url ? (
+                  <img
+                    src={child.avatar_url}
+                    alt={child.nickname}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-2xl font-bold text-white">
+                    {child.nickname[0].toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <span className="text-xs font-medium text-gray-700 text-center max-w-[80px] truncate">
+                {child.nickname}
+              </span>
+            </div>
+          ))}
+          {/* Add Child Button */}
+          <div
+            className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer"
+            onClick={() => setShowAddChild(true)}
+          >
+            <div className="w-16 h-16 rounded-full border-2 border-[#5CE1C6] bg-[#5CE1C6] flex items-center justify-center hover:bg-[#4BC9B0] transition-colors">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="white" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="w-8 h-8"
+              >
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </div>
+            <span className="text-xs font-medium text-gray-700 text-center max-w-[80px] truncate">
+              Add Child
+            </span>
+          </div>
+        </div>
+        {/* Family Code */}
+        <div className="bg-white rounded-2xl p-6 mb-4">
+          <div className="flex justify-between items-center">
             <div>
               <p className="text-gray-600 text-sm mt-1">Family Code: 
                 <span className="font-mono font-bold ml-2">{family?.family_code || 'Loading...'}</span>
@@ -602,37 +789,6 @@ export default function ParentHome() {
               Copy
             </button>
           </div>
-          <button
-            onClick={() => setShowAddChild(!showAddChild)}
-            className="w-full px-4 py-2 bg-gradient-to-r from-[#FF7F7F] to-[#FFB6C1] text-white rounded-lg hover:from-[#FF6B6B] hover:to-[#FFA5B0] transition-colors text-sm font-medium"
-          >
-            {showAddChild ? 'Cancel' : '+ Add Child'}
-          </button>
-          {showAddChild && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-3">
-              <input
-                type="text"
-                placeholder="Nickname"
-                value={newNickname}
-                onChange={(e) => setNewNickname(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6]"
-              />
-              <input
-                type="text"
-                placeholder="PIN"
-                value={newPin}
-                onChange={(e) => setNewPin(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5CE1C6]"
-              />
-              <button
-                onClick={handleAddChild}
-                disabled={addingChild}
-                className="w-full px-4 py-2 bg-[#5CE1C6] text-white rounded-lg hover:bg-[#4BC9B0] transition-colors disabled:opacity-50"
-              >
-                {addingChild ? 'Adding...' : 'Add'}
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Summary Cards */}
@@ -640,7 +796,7 @@ export default function ParentHome() {
           {/* Pending Approvals */}
           <div 
             onClick={() => navigate('/parent/approvals')}
-            className="bg-gradient-to-br from-[#5CE1C6] to-[#4BC9B0] rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow"
+            className="bg-gradient-to-br from-[#5CE1C6] to-[#4BC9B0] rounded-2xl p-6 cursor-pointer transition-opacity hover:opacity-90"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -650,31 +806,40 @@ export default function ParentHome() {
             </div>
           </div>
 
-          {/* Weekly Points */}
-          <div className="bg-gradient-to-br from-[#FF7F7F] to-[#FFB6C1] rounded-2xl shadow-lg p-6">
+          {/* Assign Chore */}
+          <div 
+            onClick={() => navigate('/parent/chores')}
+            className="bg-gradient-to-br from-[#FF7F7F] to-[#FFB6C1] rounded-2xl p-6 cursor-pointer transition-opacity hover:opacity-90"
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white text-sm mb-1 opacity-90">Weekly Total</p>
-                <p className="text-3xl font-bold text-white">{weeklyPoints} pts</p>
+                <p className="text-white text-sm mb-1 opacity-90">Assign Chore</p>
+                <p className="text-lg font-bold text-white">→</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Children Progress */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="bg-white rounded-2xl p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Children Progress</h2>
           {children.length === 0 ? (
             <p className="text-gray-500 text-center py-8">No children registered.</p>
           ) : (
             <div className="space-y-4">
               {children.map((child) => {
-                const progress = Math.min(100, (child.points / 100) * 100); // Example: 100 points = 100%
+                // Calculate progress based on goal_points
+                const goalPoints = child.goal_points || 100; // Default to 100 if no goal set
+                const progress = goalPoints > 0 
+                  ? Math.min(100, (child.points / goalPoints) * 100)
+                  : 0;
                 return (
                   <div key={child.id} id={`child-${child.id}`} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-gray-800">{child.nickname}</span>
-                      <span className="text-sm text-gray-600">{child.points} pts</span>
+                      <span className="text-sm text-gray-600">
+                        {child.points} / {goalPoints} pts
+                      </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
                       <div
