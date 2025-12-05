@@ -276,7 +276,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 기존 자녀들 초기화 실행
+-- 기존 자녀들 초기화 실행.
 SELECT initialize_character_progress_for_existing_children();
 
 
